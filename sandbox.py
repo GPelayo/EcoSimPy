@@ -1,8 +1,5 @@
-"""
-DON"T COMMIT MEEEEEE
-"""
-
 import pyglet
+from pyglet.image import Animation, AnimationFrame
 import random
 import math
 
@@ -26,7 +23,7 @@ class Rectangle(GLShape):
                                                 self.x, self.y + self._length]))
 
 
-class Graphic:
+class Graphic:s
     def __init__(self, width, length):
         self.x = 0
         self.y = 0
@@ -74,7 +71,7 @@ class GameObject:
         self._graphic = graphic
         self._graphic.x = self.x
         self._graphic.x = self.y
-        self._data_lib = DataLibrary()
+        self.data_lib = DataLibrary()
         self._component_list = []
         self._tick = 0
         self._max_tick = 10000
@@ -122,12 +119,9 @@ class ZeroDistanceError(Exception):
     message = "Distance is zero."
 
 
-test_path = []
-
-
 def create_path(org_x, org_y, dest_x, dest_y, speed):
-    global test_path
-    time_to_dest = math.sqrt(math.pow(dest_y - org_y, 2) + math.pow(dest_y - org_y, 2))/speed
+    distance = math.sqrt(math.pow(dest_x - org_x, 2) + math.pow(dest_y - org_y, 2))
+    time_to_dest = distance/speed
 
     if time_to_dest <= 0:
         raise ZeroDistanceError
@@ -142,6 +136,42 @@ def create_path(org_x, org_y, dest_x, dest_y, speed):
 
 
 class WanderComponent(GameComponent):
+    name = 'Wander'
+
+    def __init__(self, speed, environment):
+        super().__init__(environment)
+        self.speed = speed
+        self.destination_x = 0
+        self.destination_y = 0
+        self.random = random.Random()
+        self.cur_step = 0
+        self.path = init_empty_gen()
+        self.max_distance = 100
+        self.max_x = environment.width
+        self.max_y = environment.length
+
+    def get_path(self, obj: GameObject, farthest_left, farthest_right, farthest_south, farthest_north):
+        while True:
+            self.destination_x = obj.x + self.random.randint(farthest_left, farthest_right)
+            self.destination_y = obj.y + self.random.randint(farthest_south, farthest_north)
+            dy = self.destination_y - obj.y
+            dx = self.destination_x - obj.x
+            if dy != 0 and dx != 0 and 0 <= self.destination_x <= self.max_x and 0 <= self.destination_y < self.max_y:
+                obj.data_lib.add_data(self, 'dx', dx)
+                obj.data_lib.add_data(self, 'dy', dy)
+                break
+
+        self.path = create_path(obj.x, obj.y, self.destination_x, self.destination_y, self.speed)
+
+    def update(self, obj: GameObject, tick):
+        next_step = next(self.path, None)
+        if next_step:
+            obj.move(next_step[0], next_step[1])
+        else:
+            self.get_path(obj, -self.max_distance, self.max_distance, -self.max_distance, self.max_distance)
+
+
+class UserMoveComponent(GameComponent):
     name = 'Wander'
 
     def __init__(self, speed, environment):
@@ -193,7 +223,43 @@ class Environment:
             obj.draw()
 
 
-class SpriteGraphic(Graphic):
+class AnimatedGraphic(Graphic):
+    DEFAULT_ANIMATION_DURATION = 0.25
+
+    def __init__(self, sprite_sheet_filepath, coordinates, width, length, scale=1):
+        super().__init__(width, length)
+        sprite_sheet = pyglet.image.load(sprite_sheet_filepath)
+        self._images = [sprite_sheet.get_region(cood[0], cood[1], width, length) for cood in coordinates]
+        antn_list = [AnimationFrame(img, self.DEFAULT_ANIMATION_DURATION) for img in self._images]
+        self._animation = Animation(antn_list)
+        if scale > 1:
+            self.resize(width*2, length*2)
+        else:
+            self.resize(width, length)
+
+    def draw(self):
+        self._sprite.draw()
+
+    def resize(self, width, length):
+        for img in self._images:
+            img.get_texture().width = width
+            img.get_texture().height = length
+        antn_list = [AnimationFrame(img, self.DEFAULT_ANIMATION_DURATION) for img in self._images]
+        self._animation = Animation(antn_list)
+        self._width = width
+        self._length = length
+        self._sprite = pyglet.sprite.Sprite(self._animation)
+
+    def move(self, x, y):
+        super().move(x, y)
+        self._sprite.set_position(x, y)
+
+    def move_offset(self, x, y):
+        super().move_offset(x, y)
+        self._sprite.set_position(self.x + x, self.y + y)
+
+
+class ImageGraphic(Graphic):
     def __init__(self, image_location: str, width, length):
         super().__init__(width, length)
         self._image = pyglet.image.load(image_location)
@@ -225,17 +291,17 @@ class DataLibrary:
     def __init__(self):
         self.data_list = {}
 
-    def add_data(self, component: GameComponent, field_name, data):
-        self.data_list.setdefault(component.name, {})[field_name] = data
+    def add_data(self, component, field_name, data):
+        self.data_list[field_name] = (data, id(component))
 
-    def get_entry(self, component: GameComponent, field_name):
-        return self.data_list[component.name][field_name]
+    def get_entry(self, field_name):
+        return self.data_list[field_name][0]
 
 
 class Tangle(GameObject):
     def __init__(self):
         global env
-        super().__init__(self, SpriteGraphic('images.png', 25, 25))
+        super().__init__(self, AnimatedGraphic('sprites.png', [(0, 210), (0, 180)], 16, 16, scale=2))
         self._component_list.append(WanderComponent(2, env))
         self.move(250, 250)
 
@@ -250,11 +316,7 @@ def on_draw():
     global test_path
     w.clear()
     env.draw_objects()
-    for point in test_path:
-        pyglet.graphics.draw(1, pyglet.gl.GL_POINTS,
-                             ('v2i', (int(point[0]) + 12, int(point[1]) + 12)),
-                             ('c3B', (255, 255, 255))
-                             )
+
 
 def update_environment(dt):
     env.update_objects(dt)
