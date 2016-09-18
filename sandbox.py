@@ -23,7 +23,7 @@ class Rectangle(GLShape):
                                                 self.x, self.y + self._length]))
 
 
-class Graphic:s
+class Drawable:
     def __init__(self, width, length):
         self.x = 0
         self.y = 0
@@ -54,7 +54,7 @@ class Graphic:s
         self.y += y
 
 
-class GLDrawnGraphic(Graphic):
+class GLDrawnDrawable(Drawable):
     def __init__(self, width, length):
         super().__init__(width, length)
         self.shape_list = []
@@ -64,13 +64,15 @@ class GLDrawnGraphic(Graphic):
 
 
 class GameObject:
-    def __init__(self, name, graphic: Graphic):
+    def __init__(self, name, drawable: Drawable):
         self.name = name
         self.x = 0
         self.y = 0
-        self._graphic = graphic
-        self._graphic.x = self.x
-        self._graphic.x = self.y
+        self._drawable = drawable
+        self._drawable.x = self.x
+        self._drawable.y = self.y
+        self.dx = 0
+        self.dy = 0
         self.data_lib = DataLibrary()
         self._component_list = []
         self._tick = 0
@@ -82,23 +84,31 @@ class GameObject:
         self._tick += 1
 
         for cmp in self._component_list:
-            cmp.update(self, tick)
+            cmp.update(self, self._tick)
 
     def draw(self):
-        self._graphic.draw()
+        self._drawable.draw()
 
     def resize(self, width, length):
-        self._graphic.resize(width, length)
+        self._drawable.resize(width, length)
 
     def move(self, x, y):
+        self.dy = y - self.y
+        self.dx = x - self.x
         self.x = x
         self.y = y
-        self._graphic.move(x, y)
+        self._drawable.move(x, y)
 
     def move_offset(self, x, y):
+        self.dy = y
+        self.dx = x
         self.x += x
         self.y += y
-        self._graphic.move_offset(x, y)
+        self._drawable.move_offset(x, y)
+
+    def rotate(self, degrees):
+        if isinstance(self._drawable, Animation):
+            self._drawable.rotation = degrees
 
 
 class GameComponent:
@@ -157,8 +167,6 @@ class WanderComponent(GameComponent):
             dy = self.destination_y - obj.y
             dx = self.destination_x - obj.x
             if dy != 0 and dx != 0 and 0 <= self.destination_x <= self.max_x and 0 <= self.destination_y < self.max_y:
-                obj.data_lib.add_data(self, 'dx', dx)
-                obj.data_lib.add_data(self, 'dy', dy)
                 break
 
         self.path = create_path(obj.x, obj.y, self.destination_x, self.destination_y, self.speed)
@@ -223,15 +231,33 @@ class Environment:
             obj.draw()
 
 
-class AnimatedGraphic(Graphic):
-    DEFAULT_ANIMATION_DURATION = 0.25
+class DrawableRotationSetting:
+    STATIC = 0
+    ANGULAR = 3
 
-    def __init__(self, sprite_sheet_filepath, coordinates, width, length, scale=1):
+
+class AnimatedDrawable(Drawable):
+    DEFAULT_ANIMATION_DURATION = 0.25
+    test_int = 0
+
+    def __init__(self, sprite_sheet_filepath, coordinates, width, length, scale=1,
+                 rotation_setting=DrawableRotationSetting.STATIC, default_direction=0):
         super().__init__(width, length)
         sprite_sheet = pyglet.image.load(sprite_sheet_filepath)
-        self._images = [sprite_sheet.get_region(cood[0], cood[1], width, length) for cood in coordinates]
+        self._images = []
+
+        for cood in coordinates:
+            img = sprite_sheet.get_region(cood[0], cood[1], width, length)
+            img.anchor_x = width//2 * scale
+            img.anchor_y = length//2 * scale
+            self._images.append(img)
         antn_list = [AnimationFrame(img, self.DEFAULT_ANIMATION_DURATION) for img in self._images]
         self._animation = Animation(antn_list)
+        self._sprite = pyglet.sprite.Sprite(self._images[0])
+        self.default_angle = default_direction
+        self.rotation_setting = rotation_setting
+        self.dx = 0
+        self.dy = 0
         if scale > 1:
             self.resize(width*2, length*2)
         else:
@@ -248,18 +274,41 @@ class AnimatedGraphic(Graphic):
         self._animation = Animation(antn_list)
         self._width = width
         self._length = length
-        self._sprite = pyglet.sprite.Sprite(self._animation)
 
     def move(self, x, y):
-        super().move(x, y)
-        self._sprite.set_position(x, y)
+        self.dx = x - self.x
+        self.dy = y - self.y
+        self.rotate()
+        self._change_coordinates(x, y)
 
     def move_offset(self, x, y):
+        self.dx += x
+        self.dy += y
+        self.rotate()
         super().move_offset(x, y)
-        self._sprite.set_position(self.x + x, self.y + y)
+
+    def _change_coordinates(self, x, y):
+        self.x = x
+        self.y = y
+        self._sprite.set_position(x, y)
+
+    def rotate(self):
+        self.test_int = self.test_int % 360 + 10
+        if self.rotation_setting == DrawableRotationSetting.ANGULAR:
+            try:
+                if self.dx < 0:
+                    rotation_angle = -math.atan(self.dy/self.dx) * 60 + 180
+                else:
+                    rotation_angle = -math.atan(self.dy/self.dx) * 60
+            except ZeroDivisionError:
+                if self.dy < 0:
+                    rotation_angle = 90
+                else:
+                    rotation_angle = 270
+            self._sprite.rotation = rotation_angle
 
 
-class ImageGraphic(Graphic):
+class ImageDrawable(Drawable):
     def __init__(self, image_location: str, width, length):
         super().__init__(width, length)
         self._image = pyglet.image.load(image_location)
@@ -301,7 +350,8 @@ class DataLibrary:
 class Tangle(GameObject):
     def __init__(self):
         global env
-        super().__init__(self, AnimatedGraphic('sprites.png', [(0, 210), (0, 180)], 16, 16, scale=2))
+        super().__init__(self, AnimatedDrawable('sprites.png', [(90, 210), (90, 180)], 16, 16, scale=2,
+                                                rotation_setting=DrawableRotationSetting.ANGULAR))
         self._component_list.append(WanderComponent(2, env))
         self.move(250, 250)
 
@@ -313,7 +363,6 @@ env.add_object(Tangle())
 @w.event
 def on_draw():
     global env
-    global test_path
     w.clear()
     env.draw_objects()
 
