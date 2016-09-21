@@ -1,21 +1,13 @@
 from pyglet.image import Animation
 from drawables import Drawable
-
-
-class DataLibrary:
-    def __init__(self):
-        self.data_list = {}
-
-    def add_data(self, component, field_name, data):
-        self.data_list[field_name] = (data, id(component))
-
-    def get_entry(self, field_name):
-        return self.data_list[field_name][0]
+from datalib import DataLib
 
 
 class GameObject:
-    def __init__(self, name, drawable: Drawable):
+    def __init__(self, name, drawable: Drawable, env=None):
+        self._env = env
         self.name = name
+        self._attributes = []
         self.x = 0
         self.y = 0
         self._drawable = drawable
@@ -23,17 +15,31 @@ class GameObject:
         self._drawable.y = self.y
         self.dx = 0
         self.dy = 0
-        self.data_lib = DataLibrary()
-        self._component_list = []
+        self.data_lib = DataLib()
+        self.__component_list = []
         self._tick = 0
         self._max_tick = 10000
+        self.flagged_for_removal = False
+
+    @property
+    def env(self):
+        return self._env
+
+    def set_env(self, env):
+        if env:
+            for cpmnt in self.__component_list:
+                cpmnt.set_env(env)
+        self._env = env
+
+    def has_attribute(self, attribute):
+        return attribute in self._attributes
 
     def update(self, dt):
         if self._tick > 10000:
             self._tick = 0
         self._tick += 1
 
-        for cmp in self._component_list:
+        for cmp in self.__component_list:
             cmp.update(self, self._tick)
 
     def draw(self):
@@ -60,3 +66,10 @@ class GameObject:
         if isinstance(self._drawable, Animation):
             self._drawable.rotation = degrees
 
+    def _add_component(self, component):
+        if self.env:
+            component.set_env(self.env)
+        self.__component_list.append(component)
+
+    def on_collision(self, obj):
+        pass

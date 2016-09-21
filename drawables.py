@@ -98,7 +98,7 @@ class AnimatedDrawable(Drawable):
         self.dx = 0
         self.dy = 0
         if scale > 1:
-            self.resize(width*2, length*2)
+            self.resize(width*scale, length*scale)
         else:
             self.resize(width, length)
 
@@ -151,6 +151,8 @@ class ImageDrawable(Drawable):
     def __init__(self, image_location: str, width, length):
         super().__init__(width, length)
         self._image = pyglet.image.load(image_location)
+        self._image.anchor_x = width//2
+        self._image.anchor_y = length//2
         self._sprite = pyglet.sprite.Sprite(self._image)
         self.resize(width, length)
 
