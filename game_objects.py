@@ -3,6 +3,11 @@ from drawables import Drawable
 from datalib import DataLib
 
 
+class Layer:
+    GROUND_FLOOR = 0
+    GROUND = 1
+
+
 class GameObject:
     def __init__(self, name, drawable: Drawable, width, height, env=None):
         self._env = env
@@ -22,6 +27,7 @@ class GameObject:
         self._tick = 0
         self._max_tick = 10000
         self.flagged_for_removal = False
+        self.layer = Layer.GROUND
 
     @property
     def env(self):
@@ -45,7 +51,7 @@ class GameObject:
         self._tick += 1
 
         for cmp in self.__component_list:
-            cmp.update(self, self._tick)
+            cmp.update(self, dt)
 
     def draw(self):
         self._drawable.draw()

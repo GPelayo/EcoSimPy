@@ -1,18 +1,33 @@
 class DataLib:
+    class DataValue:
+        def __init__(self, value, comment):
+            self.value = value
+            self.comment = comment
+
     def __init__(self):
         self.__lib = {}
 
     def has_field(self, field):
         return field in self.__lib
 
-    def get_value(self, field):
-        return self.__lib[field][0]
+    def get_value(self, field, default=None):
+        try:
+            return self.__lib[field].value
+        except KeyError:
+            return default
 
-    def set_value(self, field, value, component_name):
-        self.__lib[field] = (value, component_name)
+    def add_value(self, field, value):
+        self.__lib[field].value += value
+        return self.__lib[field].value
 
-    def get_last_component_of_value(self, field):
-        return self.__lib[field][1]
+    def set_value(self, field, value, comment):
+        self.__lib[field] = self.DataValue(value, comment)
+
+    def get_value_comment(self, field):
+        return self.__lib[field].comment
+
+    def pop_value(self, field):
+        return self.__lib.pop(field).value
 
 
 class LibKey:

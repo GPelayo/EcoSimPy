@@ -14,6 +14,7 @@ class GameComponent:
 
     def __init__(self):
         self._env = None
+        self.dt_remainder = 0
 
     @property
     def env(self):

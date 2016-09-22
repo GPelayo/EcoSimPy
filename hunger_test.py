@@ -2,7 +2,7 @@ import pyglet
 from pyglet.image import Animation, AnimationFrame
 from environment import Environment, MouseInputType, CantFindObjectError
 from drawables import AnimatedDrawable, DrawableRotationSetting, ImageDrawable
-from game_objects import GameObject
+from game_objects import GameObject, Layer
 from component import WanderComponent, BehaviorComponent, LibraryValueTrigger, PathingStates, \
     GameComponent, init_empty_gen
 from datalib import LibKey
@@ -54,24 +54,34 @@ class Grass(GameObject):
         self.data_lib.set_value('was_eaten', False, 'collision')
         h = HealthComponent(100)
         h.add_health_change_condition('was_eaten', True, -100)
+        self.data_lib.set_value(HungerComponent.FOOD_VALUE_KEY, 5, 'Grass.init')
         self._add_component(h)
         self.move(x, y)
+        self.layer = Layer.GROUND_FLOOR
 
     def on_collision(self, obj: GameObject):
         if obj.has_attribute('herbivore'):
-            self.data_lib.set_value('was_eaten', True, 'collision')
+            if obj.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
+                self.data_lib.set_value('was_eaten', True, 'collision')
 
 
 class HungerComponent(GameComponent):
+    FOOD_VALUE_KEY = 'food_value'
+    IS_HUNGRY_KEY = 'is_hungry'
+    STOMACH_VALUE_KEY = 'stomach'
     name = 'hunger'
     run_speed = 5
 
-    def __init__(self, max_hunger, min_hunger, hunger_speed):
+    def __init__(self, max_hunger, hunt_hunger, hunger_speed, full_hunger=None):
         super().__init__()
-        self.hunger = 100
+        self.hunger_val = 100
         self.hunger_speed = hunger_speed
         self.max_hunger = max_hunger
-        self.min_hunger = min_hunger
+        self.hunt_hunger = hunt_hunger
+        if full_hunger:
+            self.full_hunger = full_hunger
+        else:
+            self.full_hunger = 0
         self.not_hunger_behavior = None
         self.path = None
         self.destination_x = 0
@@ -91,34 +101,55 @@ class HungerComponent(GameComponent):
         self.not_hunger_behavior = component
 
     def update(self, obj: GameObject, tick):
-        if self.min_hunger <= self.hunger:
+        self.dt_remainder += tick
+        if obj.data_lib.has_field(self.STOMACH_VALUE_KEY):
+            self.hunger_val -= obj.data_lib.pop_value(self.STOMACH_VALUE_KEY)
+
+        if self.hunt_hunger <= self.hunger_val:
+            obj.data_lib.set_value(self.IS_HUNGRY_KEY, True, self.name)
+
+        if self.full_hunger >= self.hunger_val:
+            obj.data_lib.set_value(self.IS_HUNGRY_KEY, False, self.name)
+
+        if obj.data_lib.get_value(self.IS_HUNGRY_KEY):
             try:
-                closest_obj_x, closest_obj_y = obj.env.find_closest_obj_coordinates(obj, 'plant')
-                if Environment.has_collision(closest_obj_x, closest_obj_y, self.destination_x, self.destination_y) and \
+                closest_obj = obj.env.find_closest_obj_coordinates(obj, 'plant')
+                if obj.has_collision(closest_obj) and \
                         self.pathing_state != PathingStates.MOVING:
                     self.pathing_state = PathingStates.IDLE
                 elif self.pathing_state == PathingStates.IDLE or self.pathing_state == PathingStates.MOVING:
                     self.not_hunger_behavior.reset()
                     self.pathing_state = PathingStates.CALCULATING
-                    self.path = PathingUtil.create_path(obj.x, obj.y, closest_obj_x, closest_obj_y, self.run_speed)
-                    self.destination_x = closest_obj_x
-                    self.destination_y = closest_obj_y
+                    self.path = PathingUtil.create_path(obj.x, obj.y, closest_obj.x, closest_obj.y, self.run_speed)
+                    self.destination_x = closest_obj.x
+                    self.destination_y = closest_obj.y
                     self.pathing_state = PathingStates.MOVING
                 if self.pathing_state == PathingStates.MOVING:
-                    closest_obj_x, closest_obj_y = obj.env.find_closest_obj_coordinates(obj, 'plant')
-                    if (closest_obj_x, closest_obj_y) == (self.destination_x, self.destination_y):
+                    closest_obj = obj.env.find_closest_obj_coordinates(obj, 'plant')
+                    if (closest_obj.x, closest_obj.y) == (self.destination_x, self.destination_y):
                         next_step = next(self.path, None)
                         if next_step:
                             obj.move(next_step[0], next_step[1])
                     else:
                         self.pathing_state = PathingStates.IDLE
+                        obj.data_lib.set_value(self.IS_HUNGRY_KEY, False, self.name)
                 obj.data_lib.set_value(LibKey.PATHING_STATE, PathingStates.MOVING, self.name)
             except CantFindObjectError:
                 if self.not_hunger_behavior:
+                    obj.data_lib.set_value(self.IS_HUNGRY_KEY, True, self.name)
                     self.not_hunger_behavior.update(obj, tick)
-        elif self.min_hunger > self.hunger:
+        else:
             if self.not_hunger_behavior:
                 self.not_hunger_behavior.update(obj, tick)
+
+        if self.dt_remainder > 1:
+            if self.hunger_val + self.hunger_speed > self.max_hunger:
+                self.hunger_val = self.max_hunger
+            elif self.hunger_val + self.hunger_speed < 0:
+                self.hunger_val = 0
+            else:
+                self.hunger_val += self.hunger_speed
+            self.dt_remainder -= 1
 
 
 class HungryBuddy(GameObject):
@@ -128,21 +159,22 @@ class HungryBuddy(GameObject):
         super().__init__('octy', drawable, 16, 16)
         self._attributes = ['herbivore']
 
-        hc = HungerComponent(0, 0, 0)
+        hc = HungerComponent(100, 50, 4)
         hc.set_not_hungry_behavior(self, WanderComponent(2))
         self._add_component(hc)
         self.move(250, 250)
+        self.layer = Layer.GROUND
 
     def on_collision(self, obj):
-        #Increase Hunger
-        pass
+        if obj.has_attribute('plant'):
+            if self.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
+                food_val = obj.data_lib.get_value(HungerComponent.FOOD_VALUE_KEY)
+                self.data_lib.set_value(HungerComponent.STOMACH_VALUE_KEY, food_val, 'hgrybdy-collision')
 
 w = pyglet.window.Window()
 env = Environment(w)
 env.add_object(HungryBuddy())
-env.add_object(HungryBuddy())
-env.add_object(HungryBuddy())
-env.add_object(HungryBuddy())
+env.add_spawn(Grass, 0.3)
 
 
 @w.event
@@ -172,5 +204,5 @@ def on_draw():
 def update_environment(dt):
     env.update_objects(dt)
 
-pyglet.clock.schedule_interval(update_environment, 1/100.0)
+pyglet.clock.schedule_interval(update_environment, 1/100)
 pyglet.app.run()
