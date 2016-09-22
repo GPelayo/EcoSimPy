@@ -36,7 +36,7 @@ class Environment:
                     closest_dist = dist
 
         if not closest_obj:
-            raise CantFindObjectError('They is no object near {} matching the requirements.'.format(obj))
+            raise CantFindObjectError('There is no objects near {} matching the requirements.'.format(obj))
         return closest_obj.x, closest_obj.y
 
     def get_mouse_data(self, input_type: MouseInputType):
@@ -45,8 +45,9 @@ class Environment:
     def _check_collisions(self):
         for obj1 in self._game_objects:
             for obj2 in self._game_objects:
-                if obj1 is not obj2 and Environment.has_collision(obj1.x, obj1.y, obj2.x, obj2.y):
+                if obj1.has_collision(obj2):
                     obj1.on_collision(obj2)
+                if obj2.has_collision(obj1):
                     obj2.on_collision(obj1)
 
     @staticmethod

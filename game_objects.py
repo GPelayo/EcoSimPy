@@ -4,12 +4,14 @@ from datalib import DataLib
 
 
 class GameObject:
-    def __init__(self, name, drawable: Drawable, env=None):
+    def __init__(self, name, drawable: Drawable, width, height, env=None):
         self._env = env
         self.name = name
         self._attributes = []
         self.x = 0
         self.y = 0
+        self.hitbox_width = width
+        self.hitbox_length = height
         self._drawable = drawable
         self._drawable.x = self.x
         self._drawable.y = self.y
@@ -33,6 +35,9 @@ class GameObject:
 
     def has_attribute(self, attribute):
         return attribute in self._attributes
+
+    def change_drawable(self, drawable):
+        self._drawable = drawable
 
     def update(self, dt):
         if self._tick > 10000:
@@ -70,6 +75,28 @@ class GameObject:
         if self.env:
             component.set_env(self.env)
         self.__component_list.append(component)
+
+    def has_collision(self, obj):
+        return (self.top_hitbox > obj.top_hitbox > self.bottom_hitbox
+                or self.top_hitbox > obj.bottom_hitbox > self.bottom_hitbox) \
+                and (self.left_hitbox < obj.left_hitbox < self.right_hitbox
+                     or self.left_hitbox < obj.right_hitbox < self.right_hitbox)
+
+    @property
+    def top_hitbox(self):
+        return self.x + self.hitbox_length / 2
+
+    @property
+    def bottom_hitbox(self):
+        return self.x - self.hitbox_length / 2
+
+    @property
+    def right_hitbox(self):
+        return self.y + self.hitbox_width / 2
+
+    @property
+    def left_hitbox(self):
+        return self.y - self.hitbox_width / 2
 
     def on_collision(self, obj):
         pass
