@@ -10,6 +10,10 @@ from utils import PathingUtil
 from random import Random
 
 
+class InvalidHungerSettingException(Exception):
+    pass
+
+
 class HealthComponent(GameComponent):
     def __init__(self, max_hp):
         super().__init__()
@@ -73,15 +77,21 @@ class HungerComponent(GameComponent):
     run_speed = 5
 
     def __init__(self, max_hunger, hunt_hunger, hunger_speed, full_hunger=None):
+        if full_hunger:
+            self.full_hunger = full_hunger
+        else:
+            self.full_hunger = 0
+
+        if hunt_hunger > max_hunger:
+            raise InvalidHungerSettingException('Hunting hunger value is larger than Max hunger value.')
+        if self.full_hunger > hunt_hunger:
+            raise InvalidHungerSettingException('Full Hunger value is larger than Hunting hunger value.')
+
         super().__init__()
         self.hunger_val = 100
         self.hunger_speed = hunger_speed
         self.max_hunger = max_hunger
         self.hunt_hunger = hunt_hunger
-        if full_hunger:
-            self.full_hunger = full_hunger
-        else:
-            self.full_hunger = 0
         self.not_hunger_behavior = None
         self.path = None
         self.destination_x = 0
@@ -171,9 +181,31 @@ class HungryBuddy(GameObject):
                 food_val = obj.data_lib.get_value(HungerComponent.FOOD_VALUE_KEY)
                 self.data_lib.set_value(HungerComponent.STOMACH_VALUE_KEY, food_val, 'hgrybdy-collision')
 
+
+class BadHungryBuddy(GameObject):
+    def __init__(self):
+        drawable = AnimatedDrawable('sprites.png', [(210, 180), (210, 210)], 16, 16, scale=2,
+                                    rotation_setting=DrawableRotationSetting.ANGULAR)
+        super().__init__('octy', drawable, 16, 16)
+        self._attributes = ['herbivore']
+
+        hc = HungerComponent(100, 5000, 4, full_hunger=1000)
+        hc.set_not_hungry_behavior(self, WanderComponent(2))
+        self._add_component(hc)
+        self.move(250, 250)
+        self.layer = Layer.GROUND
+
+    def on_collision(self, obj):
+        if obj.has_attribute('plant'):
+            if self.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
+                food_val = obj.data_lib.get_value(HungerComponent.FOOD_VALUE_KEY)
+                self.data_lib.set_value(HungerComponent.STOMACH_VALUE_KEY, food_val, 'hgrybdy-collision')
+
+
 w = pyglet.window.Window()
 env = Environment(w)
 env.add_object(HungryBuddy())
+env.add_object(BadHungryBuddy())
 env.add_spawn(Grass, 0.3)
 
 

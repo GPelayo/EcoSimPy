@@ -48,8 +48,6 @@ class Environment:
                     closest_obj = t_obj
                     closest_dist = dist
 
-
-
         if not closest_obj:
             raise CantFindObjectError('There is no objects near {} matching the requirements.'.format(obj))
         return closest_obj
