@@ -25,3 +25,7 @@ class PathingUtil:
                      for step in range(1, math.floor(time_to_dest) + 1)]
 
         return (path for path in test_path)
+
+
+def init_empty_gen():
+    yield

@@ -1,0 +1,2 @@
+class InvalidHungerSettingException(Exception):
+    pass

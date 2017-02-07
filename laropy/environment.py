@@ -1,6 +1,7 @@
-from utils import PathingUtil
-from game_objects import Layer
 from random import Random
+
+from laropy.utils import PathingUtil
+from laropy.game_objects import Layer
 
 
 class CantFindObjectError(Exception):

@@ -1,6 +1,6 @@
+from laropy.datalib import DataLib
+from laropy.drawables import Drawable
 from pyglet.image import Animation
-from drawables import Drawable
-from datalib import DataLib
 
 
 class Layer:

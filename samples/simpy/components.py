@@ -1,17 +1,10 @@
-import pyglet
-from pyglet.image import Animation, AnimationFrame
-from environment import Environment, MouseInputType, CantFindObjectError
-from drawables import AnimatedDrawable, DrawableRotationSetting, ImageDrawable
-from game_objects import GameObject, Layer
-from component import WanderComponent, BehaviorComponent, LibraryValueTrigger, PathingStates, \
-    GameComponent, init_empty_gen
-from datalib import LibKey
-from utils import PathingUtil
-from random import Random
-
-
-class InvalidHungerSettingException(Exception):
-    pass
+import random
+from laropy.component import GameComponent, PathingStates
+from laropy.datalib import LibKey
+from laropy.environment import CantFindObjectError
+from laropy.game_objects import GameObject
+from laropy.utils import PathingUtil, init_empty_gen
+from samples.simpy.exceptions import InvalidHungerSettingException
 
 
 class HealthComponent(GameComponent):
@@ -50,23 +43,46 @@ class AnimationChangeComponent(GameComponent):
                 obj.change_drawable(ani)
 
 
-class Grass(GameObject):
-    def __init__(self, x, y):
-        drawable = ImageDrawable('bush.png', 16, 16)
-        super().__init__('grassy', drawable, 16, 16)
-        self._attributes = ['plant']
-        self.data_lib.set_value('was_eaten', False, 'collision')
-        h = HealthComponent(100)
-        h.add_health_change_condition('was_eaten', True, -100)
-        self.data_lib.set_value(HungerComponent.FOOD_VALUE_KEY, 5, 'Grass.init')
-        self._add_component(h)
-        self.move(x, y)
-        self.layer = Layer.GROUND_FLOOR
+class WanderComponent(GameComponent):
+    name = 'Wander'
 
-    def on_collision(self, obj: GameObject):
-        if obj.has_attribute('herbivore'):
-            if obj.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
-                self.data_lib.set_value('was_eaten', True, 'collision')
+    def __init__(self, speed):
+        super().__init__()
+        self.speed = speed
+        self.destination_x = 0
+        self.destination_y = 0
+        self.random = random.Random()
+        self.cur_step = 0
+        self.path = init_empty_gen()
+        self.max_distance = 100
+        self.max_x = 0
+        self.max_y = 0
+
+    def set_env(self, env):
+        self._env = env
+        self.max_x = self.env.width
+        self.max_y = self.env.length
+
+    def reset(self):
+        self.path = init_empty_gen()
+
+    def get_path(self, obj: GameObject, farthest_left, farthest_right, farthest_south, farthest_north):
+        while True:
+            self.destination_x = obj.x + self.random.randint(farthest_left, farthest_right)
+            self.destination_y = obj.y + self.random.randint(farthest_south, farthest_north)
+            dy = self.destination_y - obj.y
+            dx = self.destination_x - obj.x
+            if dy != 0 and dx != 0 and 0 <= self.destination_x <= self.max_x and 0 <= self.destination_y < self.max_y:
+                break
+
+        self.path = PathingUtil.create_path(obj.x, obj.y, self.destination_x, self.destination_y, self.speed)
+
+    def update(self, obj: GameObject, tick):
+        next_step = next(self.path, None)
+        if next_step:
+            obj.move(next_step[0], next_step[1])
+        else:
+            self.get_path(obj, -self.max_distance, self.max_distance, -self.max_distance, self.max_distance)
 
 
 class HungerComponent(GameComponent):
@@ -160,81 +176,3 @@ class HungerComponent(GameComponent):
             else:
                 self.hunger_val += self.hunger_speed
             self.dt_remainder -= 1
-
-
-class HungryBuddy(GameObject):
-    def __init__(self):
-        drawable = AnimatedDrawable('sprites.png', [(210, 180), (210, 210)], 16, 16, scale=2,
-                                    rotation_setting=DrawableRotationSetting.ANGULAR)
-        super().__init__('octy', drawable, 16, 16)
-        self._attributes = ['herbivore']
-
-        hc = HungerComponent(100, 50, 4)
-        hc.set_not_hungry_behavior(self, WanderComponent(2))
-        self._add_component(hc)
-        self.move(250, 250)
-        self.layer = Layer.GROUND
-
-    def on_collision(self, obj):
-        if obj.has_attribute('plant'):
-            if self.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
-                food_val = obj.data_lib.get_value(HungerComponent.FOOD_VALUE_KEY)
-                self.data_lib.set_value(HungerComponent.STOMACH_VALUE_KEY, food_val, 'hgrybdy-collision')
-
-
-class BadHungryBuddy(GameObject):
-    def __init__(self):
-        drawable = AnimatedDrawable('sprites.png', [(210, 180), (210, 210)], 16, 16, scale=2,
-                                    rotation_setting=DrawableRotationSetting.ANGULAR)
-        super().__init__('octy', drawable, 16, 16)
-        self._attributes = ['herbivore']
-
-        hc = HungerComponent(100, 5000, 4, full_hunger=1000)
-        hc.set_not_hungry_behavior(self, WanderComponent(2))
-        self._add_component(hc)
-        self.move(250, 250)
-        self.layer = Layer.GROUND
-
-    def on_collision(self, obj):
-        if obj.has_attribute('plant'):
-            if self.data_lib.get_value(HungerComponent.IS_HUNGRY_KEY):
-                food_val = obj.data_lib.get_value(HungerComponent.FOOD_VALUE_KEY)
-                self.data_lib.set_value(HungerComponent.STOMACH_VALUE_KEY, food_val, 'hgrybdy-collision')
-
-
-w = pyglet.window.Window()
-env = Environment(w)
-env.add_object(HungryBuddy())
-env.add_object(BadHungryBuddy())
-env.add_spawn(Grass, 0.3)
-
-
-@w.event
-def on_mouse_press(x, y, button=None, modifiers=None):
-    r = Random()
-
-    for i in range(4):
-        rx = r.randint(-30, 30)
-        ry = r.randint(-30, 30)
-        env.add_object(Grass(x + rx, y + ry))
-
-    env.update_mouse_data(x, y, MouseInputType.CLICK)
-
-
-@w.event
-def on_mouse_motion(x, y, dx, dy):
-    env.update_mouse_data(x, y, MouseInputType.HOVER)
-
-
-@w.event
-def on_draw():
-    global env
-    w.clear()
-    env.draw_objects()
-
-
-def update_environment(dt):
-    env.update_objects(dt)
-
-pyglet.clock.schedule_interval(update_environment, 1/100)
-pyglet.app.run()
