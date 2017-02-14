@@ -1,13 +1,7 @@
-import random
-
 from laropy.datalib import LibKey
 from laropy.environment import MouseInputType
-from laropy.utils import PathingUtil
+from laropy.pathing import StraightPathing, PathingStates
 from laropy.game_objects import GameObject
-
-
-def init_empty_gen():
-    yield
 
 
 class GameComponent:
@@ -31,12 +25,6 @@ class GameComponent:
         pass
 
 
-class PathingStates:
-    IDLE = 0
-    CALCULATING = 1
-    MOVING = 2
-
-
 class MouseMoveComponent(GameComponent):
     name = 'MouseMove'
 
@@ -46,7 +34,8 @@ class MouseMoveComponent(GameComponent):
         self.destination_x = 0
         self.destination_y = 0
         self.cur_step = 0
-        self.path = init_empty_gen()
+        self.path = []
+        self.pathing = StraightPathing()
         self.pathing_state = PathingStates.IDLE
         self.mouse_input = mouse_input
 
@@ -57,7 +46,7 @@ class MouseMoveComponent(GameComponent):
             self.pathing_state = PathingStates.IDLE
         elif self.pathing_state == PathingStates.IDLE or self.pathing_state == PathingStates.MOVING:
             self.pathing_state = PathingStates.CALCULATING
-            self.path = PathingUtil.create_path(obj.x, obj.y, mouse_cood[0], mouse_cood[1], self.speed)
+            self.path = self.pathing.create_path(obj.x, obj.y, mouse_cood[0], mouse_cood[1], self.speed)
             self.destination_x = mouse_cood[0]
             self.destination_y = mouse_cood[1]
             self.pathing_state = PathingStates.MOVING

@@ -1,7 +1,6 @@
 import random
 from laropy.game_objects import GameObject
 from laropy.component import GameComponent
-from laropy.utils import PathingUtil, init_empty_gen
 
 
 class HealthComponent(GameComponent):
@@ -50,7 +49,7 @@ class WanderComponent(GameComponent):
         self.destination_y = 0
         self.random = random.Random()
         self.cur_step = 0
-        self.path = init_empty_gen()
+        self.path = []
         self.max_distance = 100
         self.max_x = 0
         self.max_y = 0
@@ -61,7 +60,7 @@ class WanderComponent(GameComponent):
         self.max_y = self.env.length
 
     def reset(self):
-        self.path = init_empty_gen()
+        self.path = create_empty_generator()
 
     def get_path(self, obj: GameObject, farthest_left, farthest_right, farthest_south, farthest_north):
         while True:

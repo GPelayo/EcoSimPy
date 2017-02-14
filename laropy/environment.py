@@ -1,6 +1,5 @@
 from random import Random
-
-from laropy.utils import PathingUtil
+from laropy.pathing import get_distance
 from laropy.game_objects import Layer
 
 
@@ -44,7 +43,7 @@ class Environment:
         closest_dist = self.width + self.length
         for t_obj in self._game_objects:
             if not attribute or t_obj.has_attribute(attribute):
-                dist = PathingUtil.get_distance(obj.x, obj.y, t_obj.x, t_obj.y)
+                dist = get_distance(obj.x, obj.y, t_obj.x, t_obj.y)
                 if closest_dist > dist:
                     closest_obj = t_obj
                     closest_dist = dist
@@ -89,7 +88,6 @@ class Environment:
         self.cps += 1
         if self.dt_total > 1:
             self.dt_total -= 1
-            # print(len(self._game_objects), self.cps)
             self.cps = 1
 
         self._check_collisions()

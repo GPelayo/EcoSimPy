@@ -1,9 +1,9 @@
 import random
-from laropy.component import GameComponent, PathingStates
+from laropy.component import GameComponent
 from laropy.datalib import LibKey
 from laropy.environment import CantFindObjectError
 from laropy.game_objects import GameObject
-from laropy.utils import PathingUtil, init_empty_gen
+from laropy.pathing import StraightPathing, PathingStates
 from samples.simpy.exceptions import InvalidHungerSettingException
 
 
@@ -49,11 +49,10 @@ class WanderComponent(GameComponent):
     def __init__(self, speed):
         super().__init__()
         self.speed = speed
-        self.destination_x = 0
-        self.destination_y = 0
         self.random = random.Random()
         self.cur_step = 0
-        self.path = init_empty_gen()
+        self.pathing = StraightPathing()
+        self.path = []
         self.max_distance = 100
         self.max_x = 0
         self.max_y = 0
@@ -64,7 +63,7 @@ class WanderComponent(GameComponent):
         self.max_y = self.env.length
 
     def reset(self):
-        self.path = init_empty_gen()
+        self.path = []
 
     def get_path(self, obj: GameObject, farthest_left, farthest_right, farthest_south, farthest_north):
         while True:
@@ -75,10 +74,11 @@ class WanderComponent(GameComponent):
             if dy != 0 and dx != 0 and 0 <= self.destination_x <= self.max_x and 0 <= self.destination_y < self.max_y:
                 break
 
-        self.path = PathingUtil.create_path(obj.x, obj.y, self.destination_x, self.destination_y, self.speed)
+        self.path = self.pathing.create_path(obj.x, obj.y, self.destination_x, self.destination_y, self.speed)
 
     def update(self, obj: GameObject, tick):
-        next_step = next(self.path, None)
+
+        next_step = next(self.path, None) if self.path else None
         if next_step:
             obj.move(next_step[0], next_step[1])
         else:
@@ -113,7 +113,8 @@ class HungerComponent(GameComponent):
         self.destination_x = 0
         self.destination_y = 0
         self.cur_step = 0
-        self.path = init_empty_gen()
+        self.path = []
+        self.pathing = StraightPathing()
         self.max_distance = 100
         self.max_x = 0
         self.max_y = 0
@@ -146,7 +147,7 @@ class HungerComponent(GameComponent):
                 elif self.pathing_state == PathingStates.IDLE or self.pathing_state == PathingStates.MOVING:
                     self.not_hunger_behavior.reset()
                     self.pathing_state = PathingStates.CALCULATING
-                    self.path = PathingUtil.create_path(obj.x, obj.y, closest_obj.x, closest_obj.y, self.run_speed)
+                    self.path = self.pathing.create_path(obj.x, obj.y, closest_obj.x, closest_obj.y, self.run_speed)
                     self.destination_x = closest_obj.x
                     self.destination_y = closest_obj.y
                     self.pathing_state = PathingStates.MOVING
