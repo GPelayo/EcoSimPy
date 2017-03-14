@@ -1,6 +1,8 @@
-from samples.simpy.components import HealthComponent, HungerComponent, WanderComponent
 from laropy.game_objects import GameObject, Layer
+from laropy.components.attributes import HealthComponent
+from laropy.components.ai import WanderComponent
 from laropy.drawables import ImageDrawable, AnimatedDrawable, DrawableRotationSetting
+from .components import HungerComponent
 from os import path
 
 ASSET_FOLDER = 'assets'

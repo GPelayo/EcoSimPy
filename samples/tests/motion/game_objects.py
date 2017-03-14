@@ -1,5 +1,6 @@
-from samples.simpy.components import WanderComponent
-from laropy.component import MouseMoveComponent, MouseInputType
+from laropy.components.ai import WanderComponent
+from laropy.components.input import MouseMoveComponent
+from laropy.environment import MouseInputType
 from laropy.game_objects import GameObject
 from laropy.drawables import AnimatedDrawable, DrawableRotationSetting
 from os import path

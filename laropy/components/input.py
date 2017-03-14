@@ -1,28 +1,8 @@
 from laropy.datalib import LibKey
-from laropy.environment import MouseInputType
 from laropy.pathing import StraightPathing, PathingStates
+from laropy.environment import MouseInputType
 from laropy.game_objects import GameObject
-
-
-class GameComponent:
-    name = None
-
-    def __init__(self):
-        self._env = None
-        self.dt_remainder = 0
-
-    @property
-    def env(self):
-        return self._env
-
-    def set_env(self, env):
-        self._env = env
-
-    def update(self, obj, tick):
-        raise NotImplementedError
-
-    def reset(self):
-        pass
+from .common import GameComponent
 
 
 class MouseMoveComponent(GameComponent):
@@ -57,35 +37,3 @@ class MouseMoveComponent(GameComponent):
                 obj.move(next_step[0], next_step[1])
         obj.data_lib.set_value(LibKey.PATHING_STATE, PathingStates.MOVING, self.name)
 
-
-class Trigger:
-    def check_condition(self, obj):
-        raise NotImplementedError
-
-
-class LibraryValueTrigger(Trigger):
-    def __init__(self, library_field, value_to_trigger):
-        self.field = library_field
-        self.value = value_to_trigger
-
-    def check_condition(self, obj: GameObject):
-        return obj.data_lib.get_value(self.field) == self.value
-
-
-class BehaviorComponent(GameComponent):
-    class Behavior:
-        component = None
-        trigger = None
-
-    behavior_table = []
-
-    def add_behavior(self, component: GameComponent, trigger: Trigger):
-        bvr = self.Behavior()
-        bvr.component = component
-        bvr.trigger = trigger
-        self.behavior_table.append(bvr)
-
-    def update(self, obj: GameObject, tick):
-        for bvr in self.behavior_table:
-            if bvr.trigger.check_condition(obj):
-                bvr.update(obj, tick)
