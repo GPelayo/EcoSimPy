@@ -12,6 +12,54 @@ class MouseInputType:
     CLICK = 'CLICK'
 
 
+class KeyboardInputType:
+    PRESS = 'PRESS'
+    RELEASE = 'RELEASE'
+
+
+class InputData:
+    class MouseData:
+        x = 0
+        y = 0
+
+        @property
+        def point(self):
+            return self.x, self.y
+
+        def set_point(self, x, y):
+            self.x = x
+            self.y = y
+
+    class KeyboardData:
+        _pressed_keys = set()
+
+        def press_key(self, key):
+            self._pressed_keys.add(key)
+
+        def release_key(self, key):
+            self._pressed_keys.remove(key)
+
+        def is_key_pressed(self, key):
+            return key in self._pressed_keys
+
+        @property
+        def pressed_keys(self):
+            return self._pressed_keys
+
+    _mouse = {
+        MouseInputType.HOVER: MouseData(),
+        MouseInputType.CLICK: MouseData()
+    }
+
+    keyboard = KeyboardData()
+
+    def get_mouse_point(self, input_type):
+        return self._mouse[input_type].point
+
+    def set_mouse_data(self, input_type, x, y):
+        self._mouse[input_type].set_point(x, y)
+
+
 class Environment:
     class SpawnData:
         def __init__(self, game_object_class, interval):
@@ -20,7 +68,7 @@ class Environment:
             self.dt_of_last_spawn = 0
 
     _game_objects = []
-    _mouse_data = {}
+    _input_data = InputData()
     _spawn_list = []
 
     def __init__(self, window, max_objects=40):
@@ -36,7 +84,13 @@ class Environment:
             self._game_objects.append(obj)
 
     def update_mouse_data(self, x, y, input_type: MouseInputType):
-        self._mouse_data[input_type] = (x, y)
+        self._input_data.set_mouse_data(input_type, x, y)
+
+    def update_keyboard_data(self, key, input_type: KeyboardInputType):
+        if input_type == KeyboardInputType.PRESS:
+            self._input_data.keyboard.press_key(key)
+        if input_type == KeyboardInputType.RELEASE:
+            self._input_data.keyboard.release_key(key)
 
     def find_closest_obj_coordinates(self, obj, attribute=None):
         closest_obj = None
@@ -53,7 +107,11 @@ class Environment:
         return closest_obj
 
     def get_mouse_data(self, input_type: MouseInputType):
-        return self._mouse_data.get(input_type, (0, 0))
+        return self._input_data.get_mouse_point(input_type)
+
+    @property
+    def keyboard_handler(self):
+        return self._input_data.keyboard
 
     def _check_collisions(self):
         for obj1 in self._game_objects:

@@ -1,4 +1,5 @@
 from .common import GameComponent
+from laropy.game_objects import GameObject
 
 
 class AnimationChangeComponent(GameComponent):

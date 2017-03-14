@@ -117,19 +117,18 @@ class AnimatedDrawable(Drawable):
     def move(self, x, y):
         self.dx = x - self.x
         self.dy = y - self.y
-        self.rotate()
-        self._change_coordinates(x, y)
+        super().move(x, y)
+        self._update_positioning()
 
     def move_offset(self, x, y):
-        self.dx += x
-        self.dy += y
-        self.rotate()
         super().move_offset(x, y)
+        self.dx = x
+        self.dy = y
+        self._update_positioning()
 
-    def _change_coordinates(self, x, y):
-        self.x = x
-        self.y = y
-        self._sprite.set_position(x, y)
+    def _update_positioning(self):
+        self.rotate()
+        self._sprite.set_position(self.x, self.y)
 
     def rotate(self):
         self.test_int = self.test_int % 360 + 10
